@@ -1,0 +1,240 @@
+﻿@page "/closedticket"
+
+@using ClosedXML.Excel
+@using MudBlazor.Dialog
+
+@inject IReqTicketService ticketService
+@inject IJSRuntime JSRuntime
+
+<style>
+    .outline-red {
+        border: 1px solid red; /* Outline with red border */
+    }
+
+    .search-input {
+        width: 400px; /* Adjust the width as needed */
+    }
+</style>
+
+<h3>Closed Tickets</h3>
+<h5 class="d-inline-flex h1-color mb-3 mud-table-container"></h5>
+@if (requests != null)
+{
+    <div class="form-group mb-3">
+        <input class="form-control search-input" type="text" placeholder="Search..."
+               @bind="Filter"
+               @bind:event="oninput">
+    </div>
+}
+
+@if (requests == null)
+{
+    <p><em>@message</em></p>
+}else
+{
+    <MudGrid>
+        <MudItem>
+            <button type="button" class="btn btn-success mb-3 mt-3" @onclick="@(() => DownloadExcelDocument())">Download to Excel</button>
+
+        </MudItem>
+
+    </MudGrid>
+    <div class="mud-table-container table-responsive">
+
+        <MudTable Items="requests"
+                  Height="100%"
+                  FixedHeader="true"
+                  Hover="true"
+                  Dense="true"
+                  Bordered="true"
+                  Elevation="20"
+                  Outlined="true"
+                  Filter="IsVisibleMud"
+                  Class="styled-table align-content-start"
+                  Style="max-height: 800px; overflow-y: auto;">
+            <HeaderContent>
+                <MudTh hidden="true">Request Id</MudTh>
+                <MudTh>Request Ticket Id</MudTh>
+                <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<Request, object>(x=>x.Delta)">Delta</MudTableSortLabel></MudTh>
+                <MudTh>CBRE Refrence</MudTh>
+                <MudTh>Requestor Name</MudTh>
+                <MudTh>Request Title</MudTh>
+                <MudTh>Priority</MudTh>
+                <MudTh>Safety Issue</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Location</MudTh>
+                <MudTh>Completed Date</MudTh>
+                <MudTh>Completed By</MudTh>
+                <MudTh>Close</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd hidden="true">@context.RequestId</MudTd>
+                    <MudTd>@context.RequestTicketId</MudTd>
+                    <MudTd Style="width: 20px">@context.Delta</MudTd>
+                    <MudTd Style="width: 150px"> @context.RequestRefNumber</MudTd>
+                    <MudTd>@context.RequestorName</MudTd>
+                    <MudTd>@context.RequestTitle</MudTd>
+                    <MudTd Style="width: 20px; align-items:center"><MudCheckBox T="bool" Value="@context.RequestPriority" ReadOnly="true"></MudCheckBox></MudTd>
+                    <MudTd Style="width: 20px; align-items:center"><MudCheckBox T="bool" Value="@context.RequestSafetyIssue" ReadOnly="true"></MudCheckBox></MudTd>
+                    <MudTd>@context.RequestStatusName</MudTd>
+                    <MudTd>@context.RequestTypeName</MudTd>
+                    <MudTd>@context.RequestLocationName</MudTd>
+                    <MudTd>@context.RequestCompletedDate.ToString("dd-MMM-yy")</MudTd>
+                    <MudTd>@context.ClosedBy</MudTd>
+                    <MudTd Style="width: 20px; align-items:center">
+                        <MudCheckBox T="bool" Value="@context.RequestClosed" ValueChanged="(e) => OnCheckBoxValueChanged(context.RequestId)" ReadOnly="false"></MudCheckBox>
+                    </MudTd>                
+
+            </RowTemplate>
+        </MudTable>
+    </div>
+    <div style="margin-left: auto; margin-right: 0; display: flex; justify-content: flex-end;">
+        <span class="mt-2">Back to top</span>
+        <MudIconButton Icon="@Icons.Material.Outlined.ArrowCircleUp" Color="Color.Error" OnClick="@ScrollToTop"></MudIconButton>
+    </div>
+}
+
+@code {
+    @inject MudBlazor.ISnackbar snackBar
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+    private IEnumerable<Request>? requests;
+
+    IEnumerable<Request>? requestDataExcel { get; set; }
+
+    private string? message = string.Empty;
+    private string? errors = string.Empty;
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            if (EmployeeDataService?.Employeeid != 0)
+            {
+                await GetClosedRequests();
+
+            }
+        }
+        catch (Exception ex)
+        {
+
+            errors = ($"Error: {ex.Message}");
+        }
+        finally
+        {
+            if (requests == null)
+            {
+                message = "No closed requests found";
+            }
+        }
+    }
+
+
+    private async Task GetClosedRequests()
+    {
+        requests = await ticketService.ReadClosedRequestAsync();
+
+    }
+
+    // Open ticket
+    private async Task OnCheckBoxValueChanged(int requestId)
+    {
+        // Check if the request has a safety issue
+
+        // Call the CloseRequestTicketAsync method to update the request status
+        bool success = await ticketService.OpenRequestTicketAsync(requestId);
+
+        if (success)
+        {
+            string formattedRequestId = FormatRequestId(requestId);
+
+            // Concatenate the formatted request ID with the snackbar message
+            string message = $"Ticket: {formattedRequestId} has been opened";
+            string positionClass = Defaults.Classes.Position.TopCenter;
+            Severity severity = Severity.Info;
+
+            ShowSnackbar(message, positionClass, severity);
+            // If the update is successful, refresh the data to remove the item from the list
+            await GetClosedRequests(); // Assuming you have a method to refresh the data
+        }
+    }
+
+    public string FormatRequestId(int requestId)
+    {
+        string prefix = "CBRE";
+        string formattedId = requestId.ToString().PadLeft(6, '0');
+        return $"{prefix}{formattedId}";
+    }
+
+    void ShowSnackbar(string message, string positionClass, Severity severity)
+    {
+        snackBar.Clear();
+        snackBar.Configuration.PositionClass = positionClass;
+        snackBar.Add(message, severity);
+    }
+
+    //Implement search
+
+    public string? Filter { get; set; }
+
+
+    public bool IsVisibleMud(Request context)
+    {
+        if (context == null)
+            return false;
+
+        // If Filter is null or empty, all items are visible
+        if (string.IsNullOrEmpty(Filter))
+            return true;
+
+        // Check if the context matches the filter
+        if (context.RequestTicketId != null && context.RequestTicketId.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestorName != null && context.RequestorName.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestRefNumber != null && context.RequestRefNumber.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestTypeName != null && context.RequestTypeName.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestLocationName != null && context.RequestLocationName.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+
+        return false;
+    }
+    // Method to scroll to the top of the page
+    private void ScrollToTop()
+    {
+        JSRuntime.InvokeVoidAsync("window.scrollTo", 0, 0);
+    }
+
+    //Download closed ticket results added April 24
+    public async Task DownloadExcelDocument()
+    {
+        using (var workbook = new XLWorkbook())
+        {
+            requestDataExcel = requests;
+
+            IXLWorksheet worksheet = workbook.Worksheets.Add("Closed CBRE Tickets");
+            worksheet.Cell(1, 1).InsertTable(requestDataExcel);
+
+            using (var stream = new MemoryStream())
+            {
+                workbook.SaveAs(stream);
+                var content = stream.ToArray();
+                var fileName = "Closed_CBRE_Tickets.xlsx";
+
+                await JSRuntime.InvokeAsync<object>("saveAsFile", fileName, Convert.ToBase64String(content));
+            }
+        }
+
+    }
+
+}

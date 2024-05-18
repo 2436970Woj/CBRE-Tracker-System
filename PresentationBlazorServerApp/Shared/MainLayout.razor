@@ -1,0 +1,51 @@
+﻿@inherits LayoutComponentBase
+@using PresentationBlazorServerApp.Pages;
+
+<MudThemeProvider Theme="_currentTheme" />
+<MudDialogProvider FullWidth="true"
+                   MaxWidth="MaxWidth.Small"
+                   CloseButton="false"
+                   DisableBackdropClick="true"
+                   NoHeader="false"
+                   Position="MudBlazor.DialogPosition.Center"
+                   CloseOnEscapeKey="false" />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Docked" Elevation="2">        
+        <MainHeader/>
+        <NavMenu/>
+    </MudDrawer>
+    <MudMainContent>
+        <MudToggleIconButton @bind-Toggled="@_drawerOpen"
+                             @bind-Open="_drawerOpen"
+                             @onclick="@DrawerToggle"
+                             Icon="@Icons.Material.Filled.Close" Color="@Color.Error" Title="Expand Menu"
+                             ToggledIcon="@Icons.Material.Filled.MenuOpen" ToggledColor="@Color.Success" ToggledTitle="Hide Menu" />
+
+       <MudContainer MaxWidth="MaxWidth.ExtraLarge" class="mt-3 mb-10">
+             @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+
+    bool _drawerOpen = true;
+
+       private readonly MudTheme _currentTheme = new()
+        {
+            Palette = new PaletteLight
+            {
+                AppbarBackground = "#cc0000",
+            },
+        };
+         
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+        
+    }
+
+}

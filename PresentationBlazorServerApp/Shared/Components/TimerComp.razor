@@ -1,0 +1,33 @@
+﻿
+
+<p>@timeElapsed</p>
+
+@code {
+    private System.Timers.Timer? timer;
+    private TimeSpan elapsedTime;
+    private string? timeElapsed;
+
+    protected override void OnInitialized()
+    {
+        timer = new System.Timers.Timer(1000); // Timer to update every second
+        timer.Elapsed += UpdateTimeElapsed!;
+        timer.Enabled = true;
+
+        elapsedTime = TimeSpan.Zero;
+    }
+
+    private void UpdateTimeElapsed(object sender, System.Timers.ElapsedEventArgs e)
+    {
+        elapsedTime = elapsedTime.Add(TimeSpan.FromSeconds(1)); // Increment time by 1 second
+        timeElapsed = $"{elapsedTime.Hours:D2}:{elapsedTime.Minutes:D2}:{elapsedTime.Seconds:D2}";
+
+        // Notify Blazor to re-render the component
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Dispose of the timer to avoid memory leaks
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}

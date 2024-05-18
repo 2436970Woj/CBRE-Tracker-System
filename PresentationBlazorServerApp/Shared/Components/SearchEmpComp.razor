@@ -1,0 +1,69 @@
+﻿@inject IEmployeeService employeeService
+
+
+<MudAutocomplete     T="Personnel" 
+                     Label="Select Requestor"                     
+                     Value="@value1"
+                     Variant="MudBlazor.Variant.Outlined"
+                     SearchFunc="@Search"
+                     ToStringFunc="@(e=> e==null?null : $"{e.FullName} ({e.USR_ID})")"
+                     @ref=autocompleteRef
+                     MaxItems="null"
+                     Required="false"
+                     Clearable ="true"
+                     ValueChanged="@(args => OnUserChanged(args))"
+                     OnClearButtonClick="@ClearUserSelection"
+                    ResetValueOnEmptyText="true" />
+
+
+@code {
+    private Personnel? value1;
+    private MudAutocomplete<Personnel>? autocompleteRef;
+    private string? selectedUserId;
+
+    [Parameter]
+    public EventCallback<string> OnUserChange { get; set; }
+
+
+    private async Task<IEnumerable<Personnel>> Search(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Enumerable.Empty<Personnel>(); // Return an empty collection if the search value is null or empty
+        }
+
+        return await employeeService.SearchPersonnel(value);
+    }
+
+
+    private void OnUserChanged(Personnel value)
+    {
+        if (value != null)
+        {
+            selectedUserId = value.USR_ID;
+
+            OnUserChange.InvokeAsync(selectedUserId); // Emit event with the selected UserId
+
+        }
+        else
+        {
+            selectedUserId = null;
+            OnUserChange.InvokeAsync(null); // Emit event with null when no user is selected
+        }
+
+        StateHasChanged();
+    }
+
+    public void ClearUserSelection()
+    {
+        selectedUserId = null;
+        OnUserChange.InvokeAsync(null);
+
+    }
+
+    public void Reset()
+    {
+        autocompleteRef?.ResetAsync();
+        ClearUserSelection();
+    }
+}

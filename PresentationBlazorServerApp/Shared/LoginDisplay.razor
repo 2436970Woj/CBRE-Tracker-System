@@ -1,0 +1,17 @@
+﻿@if (EmployeeDataService?.employee != null && EmployeeDataService != null)
+        {
+            <div>@EmployeeDataService.FullName</div>
+        }
+        else 
+        {
+            <div class="text-white">Guest</div>
+        }
+        
+
+
+    @code {
+            [CascadingParameter]
+            public IEmployeeDataService? EmployeeDataService { get; set; }
+    }
+
+

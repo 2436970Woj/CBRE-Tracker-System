@@ -1,0 +1,64 @@
+﻿@inject IRequestDropDownService dropDown
+@using MudBlazor
+@using MudBlazor.Dialog
+@using MudBlazor.Services
+@using MudBlazor.Extensions
+@using System.Threading
+
+
+    <MudSelect T="int" Label="@labelTitle" 
+                       Text="Request Type"
+                       Value="@selectedTypeId"
+                       ValueChanged="@OnTypeChanged"
+                       Variant="MudBlazor.Variant.Outlined"
+                       Required="true">
+    @if (getTypeDropDown != null)
+    {
+        @foreach (var type in getTypeDropDown!)
+        {
+            <MudSelectItem Value="@type.RequestTypeId">@type.RequestTypeName</MudSelectItem>
+        }
+    }
+</MudSelect>
+
+@code {
+
+    private List<RequestType> getTypeDropDown = new List<RequestType>();
+
+        
+    [Parameter]
+    public EventCallback<int> OnTypeChange { get; set; }
+
+    private int selectedTypeId;
+
+    private string? labelTitle;
+
+    protected override async Task OnInitializedAsync()
+    {
+        labelTitle = null;
+        await GetDropDowns();
+    }
+
+    private async Task GetDropDowns()
+    {
+        // Implement logic to populate dropdowns
+        getTypeDropDown = await dropDown.ReadRequestTypesAsync();
+    }
+
+     private void OnTypeChanged(int typeId)
+    {
+        labelTitle = "Request Type";
+   
+        OnTypeChange.InvokeAsync(typeId);
+        selectedTypeId = typeId;
+    }
+
+    public async Task Reset()
+    {
+        selectedTypeId = 0;
+        labelTitle = null;
+        await GetDropDowns();
+
+        StateHasChanged();
+    }
+}

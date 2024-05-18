@@ -1,0 +1,52 @@
+﻿@page "/test-file-access"
+@using System.IO
+@inject IConfiguration config
+
+<h3>Test File Access</h3>
+
+<button @onclick="TestFileAccess">Test File Access</button>
+
+<p>@testResult</p>
+
+@code {
+    private string testResult = string.Empty;
+
+    private async Task TestFileAccess()
+    {
+        try
+        {
+            string? baseStoragePath = config.GetValue<string>("FileStorage");
+
+            if (string.IsNullOrEmpty(baseStoragePath))
+            {
+                testResult = "FileStorage path is not configured.";
+                return;
+            }
+
+            string testFilePath = Path.Combine(baseStoragePath, "testfile.txt");
+
+            // Write a test file
+            await File.WriteAllTextAsync(testFilePath, "This is a test file.");
+
+            // Read the test file
+            string content = await File.ReadAllTextAsync(testFilePath);
+
+            // Delete the test file
+            File.Delete(testFilePath);
+
+            // Update the result based on the file operations
+            if (content == "This is a test file.")
+            {
+                testResult = "File access test succeeded.";
+            }
+            else
+            {
+                testResult = "File access test failed. Content mismatch.";
+            }
+        }
+        catch (Exception ex)
+        {
+            testResult = $"File access test failed. Error: {ex.Message}";
+        }
+    }
+}

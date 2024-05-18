@@ -1,0 +1,82 @@
+﻿@page "/"
+
+@using PresentationBlazorServerApp.Pages.Tickets
+@using MudBlazor
+@inject IEmployeeService employeeService
+@inject IRoleChangedService RoleChangedService
+@inject NavigationManager NavigationManager
+
+
+    <CustomAuthorization>
+        <ChildContentFinance>
+            <TicketInvoicing></TicketInvoicing>     
+           
+    </ChildContentFinance>
+</CustomAuthorization>
+
+@if (EmployeeDataService?.RoleId != 4)
+{
+<MudContainer>
+    <MudCard>
+        <MudCardContent>   
+@if (EmployeeDataService != null && EmployeeDataService?.employee != null)
+{
+    <PageTitle>Create Ticket</PageTitle>
+
+                <h3>Create CBRE Ticket</h3>
+}
+else
+{
+    <PageTitle>Guest</PageTitle>
+}
+<MudItem Class="m-3">
+    <h5>Welcome @EmployeeDataService?.FirstName </h5>
+</MudItem>
+
+@if (EmployeeDataService != null && EmployeeDataService?.employee != null)
+{
+
+    <MudItem Class="m-3">
+        <p></p>
+    </MudItem>
+
+    <SubmitTicket />
+}
+else
+{
+    <MudItem Class="m-3">
+        <p>This is a restricted site. You do not have an account. If you require access please submit a request thanks.</p>
+    </MudItem>
+}
+        </MudCardContent>
+    </MudCard>
+    </MudContainer>
+}
+@code {
+
+    @inject MudBlazor.ISnackbar snackBar;
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+    string? FirstName;
+
+    protected override void OnInitialized()
+    {  
+
+        if (EmployeeDataService != null && EmployeeDataService?.employee != null)
+        {
+
+
+            FirstName = EmployeeDataService.FirstName;
+
+        }
+        else
+        {
+            FirstName = "Guest";
+        }
+
+    }
+
+
+}

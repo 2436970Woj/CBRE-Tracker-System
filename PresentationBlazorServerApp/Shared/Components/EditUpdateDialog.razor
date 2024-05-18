@@ -1,0 +1,168 @@
+﻿@using MudBlazor.Dialog
+@inject IReqTicketService ticketService
+
+
+
+<MudDialog Style="width: 100%; height:100%">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-3" />
+            Add Updates For Ticket: @requestItem?.RequestTicketId
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            @if (requestItem != null)
+            {
+                <!-- Display request properties for editing -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                         @requestItem.RequestTitle
+                </MudText>
+
+                <p class="mt-2 mb-3">@requestItem.RequestDetails</p>
+
+                <!-- Request update field -->
+                <MudItem Class="mb-2" xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="commentUpdate"
+                                  Variant="MudBlazor.Variant.Outlined"
+                                  Label="Request Update"
+                                  Immediate="true"
+                                  TextChanged="@ValidateCommentDetails"
+                                  Lines="3">
+                    </MudTextField>
+                    <MudText Style="color: red">@typeCommentsErrors</MudText>
+                    </MudItem>
+
+                <!-- Submit button -->
+                <MudButton Variant="MudBlazor.Variant.Filled" Class="mb-4" Color="Color.Success" OnClick="@SubmitForm">Add Update</MudButton>
+                <MudButton Variant="MudBlazor.Variant.Filled" Class="mx-2 mb-4" Color="Color.Dark" OnClick="@CloseForm">Close</MudButton>
+
+            }
+
+            <!-- Display request comments -->
+            @if (requestComment != null && requestComment.Any())
+            {
+                <MudSimpleTable Class="mt-3"
+                                Style="overflow-x: auto;"
+                                Dense="true"
+                                Hover="true"
+                                Bordered="true"
+                                FixedHeader="true">
+                    <thead>
+                        <tr>
+                            <th style="width:100px; background-color:silver" >Name </th>
+                            <th style="width:100px; background-color:silver">Date </th>
+                            <th style="background-color:silver">Update Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var comment in requestComment)
+                        {
+                            <tr>
+                                <td>@comment.RequestorName</td>
+                                <td>@comment.CommentDate.ToString("dd-MMM-yy")</td>
+                                <td>@comment.CommentUpdate</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        </MudForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+
+    private MudForm? form;
+
+    [CascadingParameter] MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public Request? requestItem { get; set; }
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+    private IEnumerable<RequestComment>? requestComment;
+    private string? commentUpdate;
+
+
+    //Form validation
+    bool success;
+    bool isValid = false;
+    bool isSubmitting = false;
+    private string? typeCommentsErrors;
+
+    [Parameter] public EventCallback<bool> OnUpdate { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetRequestComments();
+    }
+
+    private async Task SubmitForm()
+    {
+        isValid = true;
+
+        if (string.IsNullOrEmpty(commentUpdate))
+        {
+            typeCommentsErrors = "No details added to the update field";
+            isValid = false;
+        }
+        if (isValid)
+        {
+            int? employeeId = EmployeeDataService?.Employeeid;
+
+            if (requestItem != null && !string.IsNullOrEmpty(commentUpdate) && employeeId.HasValue)
+            {
+                isSubmitting = true;
+
+                typeCommentsErrors = null;
+                int actualEmployeeId = employeeId.Value;
+                await ticketService.CreateRequestComments(requestItem.RequestId, actualEmployeeId, commentUpdate);
+                await GetRequestComments();
+                commentUpdate = null;
+            }
+        }
+    }
+
+
+    private async Task GetRequestComments()
+    {
+        if (requestItem != null)
+        {
+            requestComment = await ticketService.ReadRequestCommentsById(requestItem.RequestId);
+        }
+    }
+
+    private void ValidateCommentDetails(string value)
+    {
+        if (isSubmitting = false && string.IsNullOrEmpty(value))
+        {
+            typeCommentsErrors = "No details added to the update field";
+        }
+        else
+        {
+            commentUpdate = value;
+            typeCommentsErrors = null;
+        }
+    }
+
+    private async Task CloseForm()
+    {
+        if (isValid)
+        {
+            await OnUpdate.InvokeAsync(true);
+            MudDialog?.Close(DialogResult.Ok(requestItem?.RequestId));
+        }
+        else
+        {
+            Cancel();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog?.Cancel();
+    }
+}

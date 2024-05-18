@@ -1,0 +1,51 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Rendering;
+
+
+@if (EmployeeDataService?.employee != null)
+{
+    @if (ChildContentAdmin != null && EmployeeDataService.RoleId == 1)
+    {
+        <div>
+            @ChildContentAdmin
+        </div>
+    }
+
+    @if (ChildContentWriteAll != null && EmployeeDataService.RoleId == 2)
+    {
+        <div>
+            @ChildContentWriteAll
+        </div>
+    }
+    @if (ChildContentSubmit != null && EmployeeDataService.RoleId == 3)
+    {
+        <div>
+            @ChildContentSubmit
+        </div>
+    }
+    @if (ChildContentFinance != null && EmployeeDataService.RoleId == 4)
+    {
+        <div>
+            @ChildContentFinance
+        </div>
+    }
+}
+
+@code {
+
+    [Parameter]
+    public RenderFragment? ChildContentAdmin { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContentWriteAll { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContentSubmit { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContentFinance { get; set; }
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+}

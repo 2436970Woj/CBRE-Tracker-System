@@ -1,0 +1,18 @@
+﻿@page "/ticketinvoice"
+
+<h3>Ticket Invoicing</h3>
+
+        @if (EmployeeDataService != null && EmployeeDataService?.employee != null)
+        {  
+            <MudItem Class="mb-3">
+            <h5>Welcome @EmployeeDataService?.FirstName </h5>
+            </MudItem>
+            <PageTitle>CBR Ticket Invoice</PageTitle>
+        }
+
+<p class="mt-5">This will provide to add invoiced values and identify when an invoice has been Paid</p>
+
+@code {
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+}

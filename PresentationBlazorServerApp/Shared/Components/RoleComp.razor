@@ -1,0 +1,79 @@
+﻿@inject IRoleService roleService
+@inject IEmployeeService employeeService
+@using Application.Interfaces.RoleServiceInterfaces
+
+@if (roles != null && EmployeeDataService?.employee != null)
+{
+    <MudGrid>
+        <MudItem>
+
+            <div class="dropdown-title">
+                <span class="m-1">Employee Role - <i>this is an example of a reusable component which triggers a NavMenu change and updates the employee role</i></span>
+            </div>
+            <RadzenDropDown @ref="roleDropDown"
+                        Data="@roles"
+                        TValue="int"
+                        TextProperty="RoleName"
+                        ValueProperty="RoleId"
+                        Placeholder="@EmployeeDataService.RoleName"
+                        Style="width: 250px"
+                        AllowClear="true"
+                        @bind-Value="@selectedRoleId"
+                        Change="@(args => OnRoleSelectionChanged(args))">
+            </RadzenDropDown>
+
+        </MudItem>
+
+    </MudGrid>
+}
+
+@code {
+    @inject NavigationManager NavigationManager;
+
+    private IEnumerable<Role>? roles;
+
+    private int selectedRoleId;
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnRoleChanged { get; set; }
+
+    [Parameter]
+    public int RoleId { get; set; }
+
+    private RadzenDropDown<int>? roleDropDown;
+    private string? placeholder;
+
+    protected override async Task OnInitializedAsync()
+    {
+        roles = await roleService.ReadRoles();
+    }
+
+    // Method to update the placeholder dynamically
+    public void UpdatePlaceholder(string newPlaceholder)
+    {
+        placeholder = newPlaceholder;
+
+        StateHasChanged();
+    }
+
+    private async Task OnRoleSelectionChanged(object value)
+    {
+        if (selectedRoleId != 0)
+        {
+            var role = await roleService.ReadRoleById(selectedRoleId);
+
+        }
+
+        // Invoke the event callback with the selected role ID
+        await OnRoleChanged.InvokeAsync(selectedRoleId);
+        
+       
+
+        // Call StateHasChanged() to trigger a re-render and update the UI
+        StateHasChanged();
+    }
+
+}

@@ -1,0 +1,69 @@
+﻿
+@inject IRequestDropDownService dropDown
+
+@if (status != null)
+{
+    <MudGrid>
+        <MudItem >
+
+            <RadzenDropDown @ref="statusDropDown"
+                            Data="@status"
+                            TValue="int"
+                            TextProperty="RequestStatusName"
+                            ValueProperty="RequestStatusId"
+                            Placeholder="@placeholder"
+                            Style="width: 220px"
+                            AllowClear="true"
+                            @bind-Value="@selectedStatusId"
+                            Change="@(args => OnStatusSelectionChanged(args))">
+            </RadzenDropDown>
+
+        </MudItem>
+
+    </MudGrid>
+}
+
+@code {
+
+
+
+    private IEnumerable<RequestStatus>? status;
+    private int selectedStatusId;
+
+    [Parameter]
+    public EventCallback<int> OnStatusChanged { get; set; }
+
+    [Parameter]
+    public int CurrentStatusId { get; set; }
+
+    private RadzenDropDown<int>? statusDropDown;
+    private string placeholder = "Select Status";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetDropDowns(); // Fetch dropdown data when the component initializes
+        SetSelectedStatus(); // Set the selected status based on the current status ID
+    }
+
+    private async Task GetDropDowns()
+    {
+        status = await dropDown.ReadRequestStatusAsync();
+        // Ensure UI reflects the loaded data
+        StateHasChanged();
+    }
+
+    private void SetSelectedStatus()
+    {
+        var currentStatus = status?.FirstOrDefault(s => s.RequestStatusId == CurrentStatusId);
+        if (currentStatus != null)
+        {
+            selectedStatusId = currentStatus.RequestStatusId;
+        }
+    }
+
+    private async Task OnStatusSelectionChanged(object value)
+    {
+        // Invoke the event callback with the selected status ID
+        await OnStatusChanged.InvokeAsync(selectedStatusId);
+    }
+}

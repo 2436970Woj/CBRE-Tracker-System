@@ -1,0 +1,370 @@
+﻿@page "/users"
+
+<PageTitle>User Admin</PageTitle>
+
+@using ClosedXML.Excel;
+@using System.Net.Http.Json
+@using MudBlazor
+@using MudBlazor.Services
+@using MudBlazor.Extensions
+@using System.Diagnostics
+@using MudBlazor.Components
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IEmployeeService employeeService
+@inject IRoleService roleService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<style>
+    .no-box {
+        border: none;
+    }
+
+    .container {
+        display: flex;
+    }
+
+    .column {
+        flex: 1;
+        padding: 10px;
+    }
+
+</style>
+
+
+<h3 Class="mb-3">Employee Page</h3>
+<MudDivider Class="mb-3 mt-2" style="border-width: 2px; border-style: solid;" />
+<CustomAuthorization>
+    <ChildContentAdmin>
+        <div class="container">
+            <div class="column">
+                <MudContainer MaxWidth="MaxWidth.Small" class="ml-1" Dense="true">
+                    <MudCard Elevation="25">
+                        <MudCardContent>
+                            <MudText Typo="Typo.subtitle2">Add Employee</MudText>
+                            <MudItem Class="mb-5">
+                                <MudAutocomplete T="Personnel" Label="Search Employee" @bind-Value="value1"
+                                                 SearchFunc="@Search" 
+                                                 ToStringFunc="@(e=> e==null?null : $"{e.FullName} ({e.USR_ID})")"
+                                                 @ref=autocompleteRef 
+                                                 MaxItems="null"/>
+                            </MudItem>
+
+                            <MudButton Variant="MudBlazor.Variant.Filled" Color="Color.Success" OnClick="AddEmployee">Add Employee</MudButton>
+                            <MudButton Variant="MudBlazor.Variant.Filled" Color="Color.Info" OnClick="ClearEmployee">Clear Employee</MudButton>
+                        </MudCardContent>
+                    </MudCard>
+                </MudContainer>
+            </div>
+            <div class="column">
+                <MudText Typo="Typo.h5" GutterBottom="true"><b>Roles Table data: User Access Options</b></MudText>
+                <MudContainer MaxWidth="MaxWidth.Small" class="mt-1 mb-10 ml-1">
+                    @if (roles != null)
+                    {
+                        <MudSimpleTable Dense="true" Hover="true" Bordered="true" Striped="false" Style="overflow-x: auto;">
+                            <thead>
+                                <tr>
+                                    <th>Id</th>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (roles != null)
+                                {
+                                    @foreach (var role in roles)
+                                    {
+                                        <tr>
+                                            <td>@role.RoleId</td>
+                                            <td>@role.RoleName</td>
+                                            <td>@role.RoleDescription</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <p>Loading roles....</p>
+                    }
+                </MudContainer>
+            </div>
+        </div>
+    </ChildContentAdmin>
+</CustomAuthorization>
+
+<br />
+
+@if (employees != null)
+{
+    <MudGrid>
+        <MudItem Class="m-2">
+            <button type="button" class="btn btn-success mb-3 mt-3" @onclick="@(() => DownloadExcelDocument())">Download to Excel</button>
+
+        </MudItem>
+    </MudGrid>
+}
+<CustomAuthorization>
+    <ChildContentAdmin>
+        @if (employees != null)
+        {
+            <MudContainer MaxWidth="MaxWidth.Medium" class="mt-1 mb-10 ml-1">
+                <MudCard Elevation="25">
+
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Id</th>
+                                <th>User ID</th>
+                                <th>First Name</th>
+                                <th>Last Name</th>
+                                <th>Role Name</th>
+                                <th>Action</th>
+
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (employees != null)
+                            {
+                                @foreach (var employee in employees)
+                                {
+                                    <tr>
+                                        <td>@employee.EmployeeId</td>
+                                        <td>@employee.UserId</td>
+                                        <td class="form-input"> @employee.FirstName</td>
+                                        <td class="form-input">@employee.LastName</td>
+
+                                        <td>
+
+                                            <InputSelect @key="employee.EmployeeId" @bind-Value="employee.RoleId" class="form-select">
+
+                                                @if (roles != null)
+                                                {
+                                                    @foreach (var role in roles!)
+                                                    {
+                                                        <option value="@role.RoleId" selected="@((employee.RoleId == role.RoleId) || (employee.RoleName == role.RoleName))">@role.RoleName</option>
+                                                    }
+                                                }
+                                            </InputSelect>
+
+                                        </td>
+
+
+                                        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary" OnClick="async () => { await UpdateEmployee(employee); }"></MudIconButton>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="async () => { await DeleteEmployee(employee); }"></MudIconButton>
+
+
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6">No employees found.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </MudCard>
+            </MudContainer>
+        }
+    </ChildContentAdmin>
+</CustomAuthorization>
+
+
+
+
+@code {
+
+    @inject MudBlazor.ISnackbar snackBar
+    @inject IDialogService DialogService
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+    private Personnel? value1;
+    private MudAutocomplete<Personnel>? autocompleteRef;
+
+    private IEnumerable<Employee>? employees;
+    private Employee? employee = new Employee();
+    private IEnumerable<Role>? roles;
+
+
+    private IEnumerable<Employee>? employeeDataExcel { get; set; }
+
+    int RoleId { get; set; }
+
+    private string? userId;
+    private int employeeId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetAllEmployees();
+        await GetAllRoles();
+
+        // Call StateHasChanged() to trigger a re-render and update the UI
+        StateHasChanged();
+    }
+
+    private async Task GetAllEmployees()
+    {
+        employees = await employeeService.ReadEmployees();
+    }
+
+    private async Task GetAllRoles()
+    {
+        roles = await roleService.ReadRoles();
+    }
+
+
+    private async Task UpdateEmployee(Employee employee)
+    {
+
+        employeeId = employee?.EmployeeId ?? 0;
+
+        if (employee != null)
+        {
+            await employeeService.UpdateEmployeeRole(employeeId, employee.RoleId);
+
+        }
+        //snackBar.Add("Add a User Id.", Severity.Warning, );
+        string message = "Employee Updated.";
+        string positionClass = Defaults.Classes.Position.TopCenter;
+        Severity severity = Severity.Success;
+
+        ShowSnackbar(message, positionClass, severity);
+
+        await GetAllEmployees();
+
+        // Call StateHasChanged() to trigger a re-render and update the UI
+        StateHasChanged();
+    }
+
+    private async Task AddEmployee()
+    {
+        userId = value1?.USR_ID;
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrWhiteSpace(userId))
+        {
+
+            string message = "Add an employee.";
+            string positionClass = Defaults.Classes.Position.TopCenter;
+            Severity severity = Severity.Warning;
+
+            ShowSnackbar(message, positionClass, severity);
+
+            return;
+        }
+
+        // Check if the user already exists
+        bool userExists = await employeeService.CheckUserExists(userId);
+        if (userExists)
+        {
+            string message = "User already exists.";
+            string positionClass = Defaults.Classes.Position.TopCenter;
+            Severity severity = Severity.Info;
+
+            ShowSnackbar(message, positionClass, severity);
+
+            return;
+        }
+
+        // Add the employee
+        if (userId != null && userExists == false)
+        {
+            if (userId != null && employee != null)
+            {
+                int newEmployeeId = await employeeService.CreateEmployee(employee, userId);
+
+                if (newEmployeeId == -1)
+                {
+                    // Display a message or perform appropriate action to indicate that the user doesn't exist
+                    string message = "User doesn't exist.";
+                    string positionClass = Defaults.Classes.Position.TopCenter;
+                    Severity severity = Severity.Error;
+
+                    ShowSnackbar(message, positionClass, severity);
+                }
+                else
+                {
+                    // Handle the case when a new employee is successfully added
+
+
+                    string message = "Employee Saved/Updated.";
+                    string positionClass = Defaults.Classes.Position.TopCenter;
+                    Severity severity = Severity.Success;
+
+                    ShowSnackbar(message, positionClass, severity);
+
+
+
+                    await GetAllEmployees();
+
+                    // Call StateHasChanged() to trigger a re-render and update the UI
+                    StateHasChanged();
+                }
+            }
+        }
+    }
+    private async Task DeleteEmployee(Employee employee)
+    {
+
+        employeeId = employee?.EmployeeId ?? 0;
+        await employeeService.DeleteEmployee(employeeId);
+
+        string message = "Employee Deactivated.";
+        string positionClass = Defaults.Classes.Position.TopCenter;
+        Severity severity = Severity.Error;
+
+        ShowSnackbar(message, positionClass, severity);
+
+        await GetAllEmployees();
+
+        // NavigationManager.NavigateTo("users", true);
+
+        // Call StateHasChanged() to trigger a re-render and update the UI
+        StateHasChanged();
+
+    }
+    public async Task DownloadExcelDocument()
+    {
+        using (var workbook = new XLWorkbook())
+        {
+            employeeDataExcel = await employeeService.ReadEmployees();
+
+            IXLWorksheet worksheet = workbook.Worksheets.Add("Employees");
+            worksheet.Cell(1, 1).InsertTable(employeeDataExcel);
+
+            using (var stream = new MemoryStream())
+            {
+                workbook.SaveAs(stream);
+                var content = stream.ToArray();
+                var fileName = "Employees.xlsx";
+
+                await JSRuntime.InvokeAsync<object>("saveAsFile", fileName, Convert.ToBase64String(content));
+            }
+        }
+
+    }
+
+    void ShowSnackbar(string message, string positionClass, Severity severity)
+    {
+        snackBar.Clear();
+        snackBar.Configuration.PositionClass = positionClass;
+        snackBar.Add(message, severity);
+    }
+
+    private async Task<IEnumerable<Personnel>> Search(string value)
+    {
+        return await employeeService.SearchPersonnel(value);
+    }
+
+    private void ClearEmployee()
+    {       
+        // Reset the selected employee to a new empty instance
+        autocompleteRef?.ResetAsync();
+
+        StateHasChanged();
+    }
+}

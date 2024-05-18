@@ -1,0 +1,64 @@
+﻿@inject IRequestDropDownService dropDown
+@using MudBlazor
+@using MudBlazor.Dialog
+@using MudBlazor.Services
+@using MudBlazor.Extensions
+@using System.Threading
+
+
+<MudSelect T="int"  Label="@labelTitle" 
+                    Text="Request Location"
+                    Value="@selectedLocationId"
+                    ValueChanged="@OnLocationChanged"
+                    Variant="MudBlazor.Variant.Outlined"
+                    Required="true">
+                    
+    @if (getLocationDropDown != null)
+    {
+        @foreach (var location in getLocationDropDown!)
+        {
+            <MudSelectItem Value="@location.RequestLocationId">@location.RequestLocationName</MudSelectItem>
+            
+        } 
+    }
+</MudSelect>
+
+
+@code {
+    private List<RequestLocation>? getLocationDropDown;
+
+    [Parameter]
+    public EventCallback<int> OnLocationChange { get; set; }
+
+    private int selectedLocationId;
+
+    private string? labelTitle;
+
+    protected override async Task OnInitializedAsync()
+    {
+        labelTitle = null;
+        await GetDropDowns();
+    }
+
+    private async Task GetDropDowns()
+    {
+        // Implement logic to populate dropdowns
+        getLocationDropDown = await dropDown.ReadRequestLocationsAsync();
+
+    }
+
+    private void OnLocationChanged(int locationId)
+    {
+        labelTitle = "Request Location";
+        OnLocationChange.InvokeAsync(locationId);
+        selectedLocationId = locationId;
+    }
+    public async Task Reset()
+    {
+        selectedLocationId = 0;
+        labelTitle = null;
+        await GetDropDowns();
+
+        StateHasChanged();
+    }
+}

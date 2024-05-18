@@ -1,0 +1,72 @@
+﻿@inject IRoleChangedService RoleChangedService
+<MudNavMenu Width="350px" Dense="false" Margin="Margin.Dense" Color="Color.Error">
+    <CustomAuthorization>
+     <ChildContentSubmit>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Typo="Typo.h5"><b>Home</b></MudNavLink>
+            <MudNavLink Href="openticket" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.PendingActions" Typo="Typo.h5"><b>Open Tickets</b></MudNavLink>
+    <MudNavLink Href="closedticket" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Close" Typo="Typo.h5"><b>Closed Tickets</b></MudNavLink>
+    </ChildContentSubmit>
+    </CustomAuthorization>
+    <CustomAuthorization>
+        <ChildContentFinance>
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Typo="Typo.h5"><b>Home</b></MudNavLink>
+            <MudNavGroup Title="Ticket Invoicing" Expanded="false" Icon="@Icons.Material.Filled.Timer" Typo="Typo.h5">
+                <MudNavLink Href="ticketinvoice" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Money" Typo="Typo.h6"><b>Tickets No Invoice</b></MudNavLink>
+                <MudNavLink Href="ticketinvoice" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MoneyOff" Typo="Typo.h6"><b>Tickets Invoice Paid</b></MudNavLink>
+            </MudNavGroup>
+        </ChildContentFinance>
+    </CustomAuthorization>
+ <CustomAuthorization>
+        <ChildContentAdmin>
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Typo="Typo.h5"><b>Home</b></MudNavLink>
+            <MudNavLink Href="openticket" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.PendingActions" Typo="Typo.h5"><b>Open Tickets</b></MudNavLink>
+            <MudNavLink Href="closedticket" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Close" Typo="Typo.h5"><b>Closed Tickets</b></MudNavLink>
+
+        <MudNavGroup Icon="@Icons.Material.Filled.AdminPanelSettings" Typo="Typo.h4" Title="Admin Access" Expanded="false">
+                <MudNavGroup Title="Request Options" Expanded="false" Icon="@Icons.Material.Filled.Timer" Typo="Typo.h5">
+                    <MudNavLink Href="request-status-admn" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Request Status Admin</MudNavLink>
+                    <MudNavLink Href="request-type-admn" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Request Type Admin</MudNavLink>
+                    <MudNavLink Href="location-admn" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Request Location Admin</MudNavLink>
+                </MudNavGroup>
+                <MudNavGroup Title="Ticket Invoicing" Expanded="false" Icon="@Icons.Material.Filled.Timer" Typo="Typo.h5">
+                    <MudNavLink Href="ticketinvoice" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Money" Typo="Typo.h6"><b>Tickets No Invoice</b></MudNavLink>
+                    <MudNavLink Href="ticketinvoice" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MoneyOff" Typo="Typo.h6"><b>Tickets Invoice Paid</b></MudNavLink>
+
+                </MudNavGroup>
+                <MudNavGroup Icon="@Icons.Material.Filled.Analytics" Typo="Typo.h3" Title="Reports" Expanded="false">
+                    <MudNavGroup Title="Report Options" Expanded="false" Icon="@Icons.Material.Filled.Report" Typo="Typo.h5">
+                        <MudNavLink Href="report1" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewList">Report One</MudNavLink>
+                        <MudNavLink Href="report2" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewList">Report Two</MudNavLink>
+                    </MudNavGroup>
+                 </MudNavGroup>
+                  <MudNavLink Href="users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People" Typo="Typo.h5"><b>Users</b></MudNavLink>
+            </MudNavGroup>
+        </ChildContentAdmin>
+  </CustomAuthorization>
+ </MudNavMenu>
+
+@code {
+
+
+    private readonly MudTheme _currentTheme = new()
+        {
+            Palette = new PaletteLight
+            {
+                AppbarBackground = "#cc0000",
+            },
+        };
+
+
+    protected override void OnInitialized()
+    {
+        RoleChangedService.OnChange += OnAppStateChanged;
+    }
+
+
+    public void OnAppStateChanged()
+    {
+        //this is triggered when condition RoleChangedService.IsRoleChanged = true
+        InvokeAsync(StateHasChanged);
+   }
+
+}

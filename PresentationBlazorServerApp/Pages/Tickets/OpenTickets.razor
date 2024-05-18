@@ -1,0 +1,464 @@
+﻿@page "/openticket"
+
+@using ClosedXML.Excel
+@using MudBlazor.Dialog
+
+
+@inject IReqTicketService ticketService
+@inject IRequestDropDownService DropDownService
+@inject IJSRuntime JSRuntime
+
+<style>
+    .outline-red {
+        border: 1px solid red; /* Outline with red border */
+    }
+
+    .search-input {
+        width: 400px; /* Adjust the width as needed */
+    }
+</style>
+
+<h3>Open Tickets</h3>
+<h5 class="d-inline-flex h1-color mb-3 mud-table-container"></h5>
+
+@if (requests != null)
+{
+    <div class="form-group mb-3">
+        <input class="form-control search-input" type="text" placeholder="Search..."
+        @bind="Filter"
+        @bind:event="oninput">
+    </div>
+}
+
+@if (requests == null)
+{
+    <p><em>@message</em></p>
+}
+else
+{
+    <MudGrid>
+        <MudItem>
+            <button type="button" class="btn btn-success mb-3 mt-3" @onclick="@(() => DownloadExcelDocument())">Download to Excel</button>
+
+        </MudItem>
+
+    </MudGrid>
+    <div class="mud-table-container table-responsive">
+
+        <MudTable Items="@requests"
+                  Height="100%"
+                  FixedHeader="true"
+                  Hover="true"
+                  Dense="true"
+                  RowStyleFunc="RowStyleFunc"
+                  Bordered ="true"                  
+                  Elevation="20"
+                  Outlined ="true"
+                  Filter="IsVisibleMud"
+                  Class="styled-table align-content-start"
+                  Style="max-height: 800px; overflow-y: auto;">
+
+            <HeaderContent>
+                <MudTh hidden="true">Request Id</MudTh>
+                <MudTh>Request Ticket Id</MudTh>
+                <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<Request, object>(x=>x.Delta)">Delta</MudTableSortLabel></MudTh>
+                <MudTh>CBRE Refrence</MudTh>
+                <MudTh>Requestor Name</MudTh>
+                <MudTh>Request Title</MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<Request, object>(x=>x.RequestPriority)">Priority</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<Request, object>(x=>x.RequestSafetyIssue)">Safety Issue</MudTableSortLabel></MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Location</MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<Request, object>(x=>x.RequestCreatedDate)">Created Date</MudTableSortLabel></MudTh>
+                <MudTh>Required Date</MudTh>
+                <MudTh >Close</MudTh>
+                <MudTh Colspan="1">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+
+                <MudTd hidden="true">@context?.RequestId</MudTd>
+                    <MudTd>@context?.RequestTicketId</MudTd>
+                    <MudTd Style="width: 20px">@context?.Delta</MudTd>
+                    <MudTd Style="width: 150px">
+                        <MudTextField T="string"
+                                      Value="@context.RequestRefNumber"
+                                      ValueChanged="(newValue) => OnCbreRefNumberChanged(newValue, context.RequestId)"
+                                      Class="@((string.IsNullOrEmpty(context?.RequestRefNumber)) ? "outline-red" : "")" />
+                    </MudTd>
+                    <MudTd DataLabel="Name">@context?.RequestorName</MudTd>
+                    <MudTd>@context?.RequestTitle</MudTd>
+                    <MudTd Style="width: 20px; align-items:center"><MudCheckBox T="bool" Value="@context.RequestPriority" ReadOnly="true"></MudCheckBox></MudTd>
+                    <MudTd Style="width: 20px; align-items:center"><MudCheckBox T="bool" Value="@context.RequestSafetyIssue" ReadOnly="true"></MudCheckBox></MudTd>
+                    <MudTd>
+                        <ReqStatusComp CurrentStatusId="@context.RequestStatusId" OnStatusChanged="@((newStatusId) => OnStatusSelectionChanged(context.RequestId,newStatusId, context.RequestSafetyIssue))" />
+                    </MudTd>
+                    <MudTd>@context?.RequestTypeName</MudTd>
+                    <MudTd>@context?.RequestLocationName</MudTd>
+                    <MudTd>@context?.RequestCreatedDate.ToString("dd-MMM-yy")</MudTd>
+                    <MudTd>@context?.RequestRequiredDate.ToString("dd-MMM-yy")</MudTd>
+                    <MudTd Style="width: 20px; align-items:center">
+                        <MudCheckBox T="bool" Value="@context.RequestClosed" ValueChanged="(e) => OnCheckBoxValueChanged(context.RequestId)" ReadOnly="false"></MudCheckBox>
+                       </MudTd>
+                    <MudTd>
+                    @if (context.RequestComments == false)
+                    {
+
+                        <MudIconButton Style="width: 20px; align-items:center" Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@((e) => OpenEditTicketDialog(context.RequestId, new List<Request>{ context }, new MudBlazor.DialogOptions() { CloseButton = true }))"></MudIconButton>
+                    }
+                    @if (context.RequestComments == true)
+                    {
+                        <MudIconButton Style="width: 20px; align-items:center" Icon="@Icons.Material.Filled.RemoveRedEye" Color="Color.Error" OnClick="@((e) => OpenEditTicketDialog(context.RequestId, new List<Request>{ context }, new MudBlazor.DialogOptions() { CloseButton = true }))"></MudIconButton>
+                    }
+                    </MudTd>
+   
+                </RowTemplate>
+ 
+            </MudTable>
+        </div>
+    <div style="margin-left: auto; margin-right: 0; display: flex; justify-content: flex-end;">
+        <span class="mt-2">Back to top</span>
+        <MudIconButton Icon="@Icons.Material.Outlined.ArrowCircleUp" Color="Color.Error" OnClick="@ScrollToTop"></MudIconButton>
+        
+</div>
+}
+@code {
+
+    @inject MudBlazor.ISnackbar snackBar
+    @inject IDialogService DialogService
+
+    [CascadingParameter] MudDialogInstance? MudDialog { get; set; }
+
+    MudBlazor.DialogOptions EditUpdateDialog = new MudBlazor.DialogOptions() { CloseButton = true };
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+
+    private IEnumerable<Request>? requests;
+
+    IEnumerable<Request>? requestDataExcel { get; set; }
+
+    private IEnumerable<CloseTicketStatusId>? closeStatus;
+
+    Request? request = new();
+
+    private string? errors = string.Empty;
+    private string? message = string.Empty;
+
+    private int selectedStatusId;
+    private int SelectedStatusId;
+    private int employeeId;
+
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            if (EmployeeDataService?.Employeeid != 0)
+            {                
+                await GetRequests(); //returns all open tickets
+                await GetEmployeeId(); //gets current employee if
+                await GetCloseStatusIds(); //returns status ids which auto close tickets on change - complete, cancel, WebQuote
+
+                selectedStatusId = SelectedStatusId;
+            }
+        }
+        catch (Exception ex)
+        {
+
+            errors =($"Error: {ex.Message}");
+        }
+        finally
+        {
+            if (requests == null)
+            {
+                message = "No open requests found";
+            }
+        }
+    }
+
+    private Task<int> GetEmployeeId()
+    {
+        if (EmployeeDataService?.Employeeid != null && EmployeeDataService.Employeeid != 0)
+        {
+            return Task.FromResult(EmployeeDataService.Employeeid.Value); // Return the value of the nullable int wrapped in a completed task
+        }
+        else
+        {
+            return Task.FromResult(0);
+        }
+    }
+
+    private async Task GetRequests()
+    {
+        requests = await ticketService.ReadOpenRequestAsync();// return all open request tickets
+    }   
+
+    private async Task GetCloseStatusIds()
+    {
+        closeStatus = await ticketService.ReadCloseTicketStatusIdAsync(); //check if status id in auto close table       
+    }
+
+
+    private async Task OnCbreRefNumberChanged(string newValue, int requestId)
+    {
+        // Check if the new value is not null or empty
+        if (!string.IsNullOrEmpty(newValue))
+        {
+            // Call the UpdateRequestCbreRefAsync method to update the CBRE reference number
+            bool success = await ticketService.UpdateRequestCbreRefAsync(requestId, newValue);
+
+            if (success)
+            {
+                string formattedRequestId = FormatRequestId(requestId);
+
+                // Concatenate the formatted request ID with the snackbar message
+                string message = $"CBRE Ref added for: {formattedRequestId}";
+                string positionClass = Defaults.Classes.Position.TopCenter;
+                Severity severity = Severity.Success;
+
+
+                ShowSnackbar(message, positionClass, severity);
+
+                StateHasChanged();
+                // If the update is successful, refresh the data to reflect the changes
+                await GetRequests(); // Assuming you have a method to refresh the data
+            }
+            else
+            {
+                // Handle the case where the update fails
+                // You can display an error message or take appropriate action
+            }
+        }
+    }
+
+    private async Task OnStatusSelectionChanged(int requestId, int newStatusId, bool requestSafetyIssue)
+    {
+        selectedStatusId = newStatusId; // Update selectedStatusId with the new status ID
+
+        await DropDownService.UpdateRequestStatusAsync(requestId, newStatusId);
+
+        await GetCloseStatusIds();
+
+        // Ensure closeStatus is not null before performing operations on it
+        if (closeStatus != null)
+        {
+            // Check if the new status ID is in the close status IDs
+            bool isCloseStatus = closeStatus.Any(status => status.RequestStatusId == newStatusId);
+            if (isCloseStatus)
+            {
+                // If the new status ID is in the close status IDs
+                if (selectedStatusId == 4)
+                {
+                    // If there is a safety issue, display the AQC dialog
+                    await OpenAqcDialog(requestId);
+                }
+                else
+                {
+                    // Close the ticket
+                    await CloseTicket(requestId);
+
+                   
+                }
+            }
+            else
+            {
+                // If the new status ID is not in the close status IDs, just update the status
+                // Show success message
+                string formattedRequestId = FormatRequestId(requestId);
+                string message = $"Ticket status successfully update. Ticket ID: {formattedRequestId}";
+                string positionClass = Defaults.Classes.Position.TopCenter;
+                Severity severity = Severity.Success;
+                ShowSnackbar(message, positionClass, severity);
+            }
+        }
+        else
+        {
+            // Handle case where closeStatus is null
+            // You can show an error message or take appropriate action
+        }
+
+        // Update the UI
+        StateHasChanged();
+    }
+
+      
+    private async Task OpenEditTicketDialog(int requestId, IEnumerable<Request> context, MudBlazor.DialogOptions options)
+    {
+        var requestItem = await ticketService.ReadOpenRequestByIdAsync(requestId);
+    
+        var parameters = new DialogParameters();
+        parameters.Add("requestItem", requestItem);
+      
+        var dialog = await DialogService.ShowAsync<EditUpdateDialog>("Edit Ticket", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            var rowToUpdate = context.FirstOrDefault(x => x.RequestId == requestId);
+            if (rowToUpdate != null)
+            {
+                rowToUpdate.RequestComments = true;
+                StateHasChanged(); // Trigger a re-render to reflect the changes in the UI
+            }
+        }
+    }
+
+   
+    // Close ticket
+    private async Task OnCheckBoxValueChanged(int requestId)
+    {
+        if (requestId != 0)
+        {
+            // Launch the AQC dialog when the checkbox is checked
+            await OpenAqcDialog(requestId);
+        }
+        // No action needed when the checkbox is unchecked
+    }
+
+    private async Task OpenAqcDialog(int requestId)
+    {
+        request = await ticketService.ReadOpenRequestByIdAsync(requestId);
+
+        if(request != null)
+        {
+        var parameters = new DialogParameters();
+        parameters.Add("request", request);
+
+
+        var dialog = await DialogService.ShowAsync<EditAqcDialog>("Edit Ticket", parameters);
+        var result = await dialog.Result;   
+         
+
+        if (!result.Canceled)
+        {
+            // If the dialog result is not cancelled, it means the confirmation button was clicked
+            // Close the ticket
+            await CloseTicket(requestId);
+        }
+       }
+    }
+
+    private async Task CloseTicket(int requestId)
+    {
+        // Retrieve the employee ID
+        employeeId = await GetEmployeeId();
+
+        // Call your service method to close the ticket
+        bool success = await ticketService.CloseRequestTicketAsync(requestId, employeeId, true);
+
+        if (success)
+        {
+            string formattedRequestId = FormatRequestId(requestId);
+            string message = $"Ticket: {formattedRequestId} has been closed";
+            string positionClass = Defaults.Classes.Position.TopCenter;
+            Severity severity = Severity.Info;
+
+            ShowSnackbar(message, positionClass, severity);
+
+         
+            // Refresh the data to remove the item from the list
+            await GetRequests();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task<bool> CloseRequestTicket(int requestId, int employeeId, bool requestClosed)
+    {
+        // Call your service method to update the request status
+        return await ticketService.CloseRequestTicketAsync(requestId, employeeId, requestClosed);
+    }
+
+    private string RowStyleFunc(Request row, int index)
+    {
+        if (row.RequestSafetyIssue == true)
+            return "background-color:#f2dede";
+
+
+        return "background-color:white";
+
+    }
+
+    public string FormatRequestId(int requestId)
+    {
+        string prefix = "CBRE";
+        string formattedId = requestId.ToString().PadLeft(6, '0');
+        return $"{prefix}{formattedId}";
+    }
+
+    void ShowSnackbar(string message, string positionClass, Severity severity)
+    {
+        snackBar.Clear();
+        snackBar.Configuration.PositionClass = positionClass;
+        snackBar.Add(message, severity);
+    }
+     
+    //Implement search
+
+    public string? Filter { get; set; }
+
+
+    public bool IsVisibleMud(Request context)
+    {
+        if (context == null)
+            return false;
+
+        // If Filter is null or empty, all items are visible
+        if (string.IsNullOrEmpty(Filter))
+            return true;
+
+        // Check if the context matches the filter
+        if (context.RequestTicketId != null && context.RequestTicketId.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestorName != null && context.RequestorName.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestRefNumber != null && context.RequestRefNumber.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestTypeName != null && context.RequestTypeName.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (context.RequestLocationName != null && context.RequestLocationName.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+
+        return false;
+    }
+
+    // Method to scroll to the top of the page
+    private void ScrollToTop()
+    {
+        JSRuntime.InvokeVoidAsync("window.scrollTo", 0, 0);
+    }
+
+    //Download open ticket results added April 24
+    public async Task DownloadExcelDocument()
+    {
+        using (var workbook = new XLWorkbook())
+        {
+            requestDataExcel = requests;
+
+            IXLWorksheet worksheet = workbook.Worksheets.Add("Open CBRE Tickets");
+            worksheet.Cell(1, 1).InsertTable(requestDataExcel);
+
+            using (var stream = new MemoryStream())
+            {
+                workbook.SaveAs(stream);
+                var content = stream.ToArray();
+                var fileName = "Open_CBRE_Tickets.xlsx";
+
+                await JSRuntime.InvokeAsync<object>("saveAsFile", fileName, Convert.ToBase64String(content));
+            }
+        }
+
+    }
+  
+}    
+
+
+

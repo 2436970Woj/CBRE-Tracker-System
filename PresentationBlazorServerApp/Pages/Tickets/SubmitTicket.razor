@@ -1,0 +1,408 @@
+﻿@page "/submitticket"
+
+@inject IRequestDropDownService dropDown
+@inject IReqTicketService ticketService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime jSRuntime
+
+@using System.Net.Http.Headers
+@using MudBlazor
+@using MudBlazor.Dialog
+@using MudBlazor.Services
+@using MudBlazor.Extensions
+
+@using System.Threading
+
+
+
+
+
+
+
+<MudContainer>
+    <MudCard>
+        <MudCardContent>
+            <h5 class="mt-3 mb-3">Ticket Request Form</h5>
+            <MudForm @ref="form" @bind-IsValid="@success">
+                <MudGrid>
+                    <MudItem xs="6">
+                        <SearchEmpComp @ref="searchEmpComp" OnUserChange="OnUserSelectionChanged" />
+                        <MudText Style="color: red">@userErrors</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField T="string"
+                                          Value="@requestTitle"
+                                          Variant="MudBlazor.Variant.Outlined"
+                                          Label="Request Title*"
+                                          Immediate="true"
+                                          TextChanged="@ValidateTitle" />
+                            <MudText Style="color: red">@titleErrors</MudText>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <ReqLocationComp @ref="resetLocComp" OnLocationChange="OnLocSelectionChanged" />
+                            <MudText Style="color: red">@locationErrors</MudText>
+                        </MudItem>
+
+                        <MudItem xs="6">
+                            <ReqTypeComp @ref="resetTypeComp" OnTypeChange="OnTypeSelectionChanged" />
+                            <MudText Style="color: red">@typeErrors</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudDatePicker Label="Required Date" @bind-Date="requestRequiredDate" Mask="@(new DateMask("dd/MM/yyyy"))" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudCheckBox T="bool" Value="@requestPriority" ValueChanged="@(async newValue => await OnPrioritySelectionChanged(newValue))" Color="Color.Primary">Priority</MudCheckBox>
+                            <MudCheckBox T="bool" Value="@requestSafetyIssue" ValueChanged="@(async newValue => await OnSafetySelectionChanged(newValue))" Color="Color.Primary">Safety Issue</MudCheckBox>
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField T="string"
+                                          Value="@requestDetails"
+                                          Variant="MudBlazor.Variant.Outlined"
+                                          Label="Request Details"
+                                          Immediate="true"
+                                          TextChanged="@ValidateReqDetails"
+                                          Lines="5">
+                            </MudTextField>
+                            <MudText Style="color: red">@typeDetailsErrors</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudCheckBox @bind-Value="@addFiles" Color="Color.Primary">Add Supporting Documentation</MudCheckBox>
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Submit button -->
+                    <MudItem xs="12" Class="mt-3">
+                        @if (addFiles)
+                    {
+                        <MudItem xs="12" Class="mt-3">
+                            <MudButton Variant="MudBlazor.Variant.Filled" Color="Color.Success" OnClick="@AddFileMethod">Load Files</MudButton>
+                            <MudButton Variant="MudBlazor.Variant.Filled" Color="Color.Secondary" OnClick="@ClearTicket">Clear</MudButton>
+
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12" Class="mt-3">
+                            <MudButton Variant="MudBlazor.Variant.Filled" Color="Color.Primary" OnClick="@SubmitNewTicket">Submit</MudButton>
+                            <MudButton Variant="MudBlazor.Variant.Filled" Color="Color.Secondary" OnClick="@ClearTicket">Clear</MudButton>
+
+                        </MudItem>
+                    }
+                    </MudItem>
+                </MudForm>
+
+
+            </MudCardContent>
+        </MudCard>
+    </MudContainer>
+
+    @code {
+
+    @inject MudBlazor.ISnackbar snackBar
+
+    [CascadingParameter]
+    public IEmployeeDataService? EmployeeDataService { get; set; }
+
+
+    MudDialogInstance? MudDialog { get; set; }
+    MudForm? form;
+    Request request = new Request();
+
+    //clear components
+    private SearchEmpComp? searchEmpComp;
+    private ReqLocationComp? resetLocComp;
+    private ReqTypeComp? resetTypeComp;
+
+    // Form Validation
+    bool success;
+    string? userErrors;
+    string? locationErrors;
+    string? typeErrors;
+    string? titleErrors;
+    string? typeDetailsErrors;
+
+    //variable to hold ticket info
+
+    private string? selectedUserId;
+    private string? requestTitle;
+    private int selectedLocationId;
+    private int selectedTypeId;
+    private string? requestDetails;
+    private bool requestPriority { get; set; }
+    private bool requestSafetyIssue { get; set; }
+    private DateTime? requestRequiredDate;
+    private int requestId;
+    bool isSubmitting = false;
+    bool isValid = false;
+    bool requestDocs = false;
+
+    private bool addFiles { get; set; }
+
+    [Parameter]
+    public EventCallback<int> SelectedValuesChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> SelectedBoolValuesChanged { get; set; }
+
+    [Parameter]
+    public string? RequestTicketId { get; set; }
+
+    // Inject IRequestDropDownService if needed
+
+    protected override void OnInitialized()
+    {
+        userErrors = "";
+        locationErrors = "";
+        typeErrors = "";
+        titleErrors = "";
+        typeDetailsErrors = "";
+
+        selectedUserId = null;
+        selectedLocationId = 0;
+        selectedTypeId = 0;
+        requestPriority = false;
+        requestSafetyIssue = false;
+        requestTitle = null;
+        requestDetails = null;
+        requestRequiredDate = null;
+
+        addFiles = false;
+        requestDocs = false;
+    }
+
+    //check user data on change
+    private void OnUserSelectionChanged(string userId)
+    {
+        selectedUserId = userId;
+        if (!string.IsNullOrEmpty(selectedUserId))
+        {
+            userErrors = "";
+        }
+    }
+
+    //check location data on change
+    private async Task OnLocSelectionChanged(int requestLocationId)
+    {
+        // Assuming single selection, so there should be only one selected value
+        selectedLocationId = requestLocationId;
+
+        await SelectedValuesChanged.InvokeAsync(requestLocationId);
+
+        if (selectedLocationId != 0)
+        {
+            locationErrors = "";
+        }
+
+    }
+
+    //check request type on change
+    private async Task OnTypeSelectionChanged(int requestTypeId)
+    {
+        selectedTypeId = requestTypeId;
+        await SelectedValuesChanged.InvokeAsync(requestTypeId);
+
+        if (selectedTypeId != 0)
+        {
+            typeErrors = null;
+        }
+    }
+
+    private async Task OnPrioritySelectionChanged(object newValue)
+    {
+        if (newValue is bool boolValue)
+        {
+            requestPriority = boolValue;
+            await SelectedBoolValuesChanged.InvokeAsync(requestPriority);
+
+            // Trigger UI update
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSafetySelectionChanged(object newValue)
+    {
+        if (newValue is bool boolValue)
+        {
+            requestSafetyIssue = boolValue;
+
+   
+                requestPriority = requestSafetyIssue; // Set requestPriority to true if requestSafetyIssue is true
+                await SelectedBoolValuesChanged.InvokeAsync(requestPriority);
+          
+            // Trigger UI update
+            StateHasChanged();
+        }
+    }
+
+
+    //check request title on change
+    private void ValidateTitle(string value)
+    {
+        if (isSubmitting = false && string.IsNullOrEmpty(value))
+        {
+            titleErrors = "Request title is required";
+        }
+        else
+        {
+            requestTitle = value;
+            titleErrors = null;
+        }
+    }
+
+    private void ValidateReqDetails(string value)
+    {
+        if (isSubmitting = false && string.IsNullOrEmpty(value))
+        {
+            typeDetailsErrors = "Request details are required";
+        }
+        else
+        {
+            requestDetails = value;
+            typeDetailsErrors = null;
+        }
+    }
+
+    private void ClearTicket()
+    {
+
+        selectedTypeId = 0;
+        selectedLocationId = 0;
+        selectedUserId = null;
+        requestPriority = false;
+        requestSafetyIssue = false;
+        requestTitle = null;
+        requestDetails = null;
+        requestRequiredDate = null;
+
+        // Reset all properties to their default values
+        titleErrors = null;
+        userErrors = null;
+        locationErrors = null;
+        typeErrors = null;
+        typeDetailsErrors = null;
+
+
+        // Call reset methods on components if available
+        searchEmpComp?.Reset();
+        resetLocComp?.Reset();
+        resetTypeComp?.Reset();
+
+
+        //reset add file
+        addFiles = false;
+
+        //reset form
+        form?.ResetAsync();
+
+        // Notify the component that its state has changed
+        StateHasChanged();
+    }
+
+    private async Task<string> SubmitNewTicket()
+    {
+        isValid = true;
+
+        if (string.IsNullOrEmpty(requestTitle))
+        {
+            titleErrors = "Request title is required";
+            isValid = false;
+        }
+        if (string.IsNullOrEmpty(requestDetails))
+        {
+            typeDetailsErrors = "Request details are required";
+            isValid = false;
+        }
+
+        if (selectedLocationId == 0)
+        {
+            locationErrors = "Select a location";
+            isValid = false;
+        }
+        if (selectedTypeId == 0)
+        {
+            typeErrors = "Select a request type";
+            isValid = false;
+        }
+        if (string.IsNullOrEmpty(selectedUserId))
+        {
+            userErrors = ""; /* EmployeeDataService?.FullName + " as requestor" */;
+            isValid = true;
+        }
+
+        if (isValid)
+        {
+            // Ticket submission logic...
+
+            if (EmployeeDataService != null && EmployeeDataService?.employee != null && EmployeeDataService.Employeeid.HasValue)
+            {
+                requestDocs = addFiles;
+
+                isSubmitting = true;
+                int employeeId = EmployeeDataService.Employeeid.Value;
+                DateTime requestRequiredDateValue = requestRequiredDate ?? DateTime.Now;
+
+                requestId = await ticketService.CreateRequestTicketAsync(request, employeeId, selectedLocationId,
+                    selectedTypeId, requestPriority, requestTitle!, requestDetails!, requestRequiredDateValue, selectedUserId!,
+                    requestSafetyIssue, requestDocs);
+
+                string formattedRequestId = FormatRequestId(requestId);
+
+                if (addFiles == false)
+                {
+                // Concatenate the formatted request ID with the snackbar message
+                string message = $"Ticket successfully submitted. Ticket ID: {formattedRequestId}";
+                string positionClass = Defaults.Classes.Position.TopCenter;
+                Severity severity = Severity.Success;
+
+
+                ShowSnackbar(message, positionClass, severity);
+
+                ClearTicket();
+                }
+
+                return formattedRequestId;// Return the ticket ID if necessary
+                
+            }
+        }
+
+        return null!; // Return null or handle the case where isValid is false
+    }
+    public string FormatRequestId(int requestId)
+    {
+        string prefix = "CBRE";
+        string formattedId = requestId.ToString().PadLeft(6, '0');
+        return $"{prefix}{formattedId}";
+    }
+
+
+    private async Task AddFileMethod()
+    {
+        if (addFiles)
+        {
+            // Call SubmitNewTicket method if "AddFile" checkbox is selected
+            string requestTicketId = await SubmitNewTicket();
+
+            RequestTicketId = requestTicketId;
+
+            // Navigate to the uploadfiles page with the requestId parameter
+            if (!string.IsNullOrEmpty(requestTicketId) && isValid)
+            {
+                NavigationManager.NavigateTo($"uploadfiles/{RequestTicketId}");
+            }
+        }
+    }
+
+    void ShowSnackbar(string message, string positionClass, Severity severity)
+    {
+        snackBar.Clear();
+        snackBar.Configuration.PositionClass = positionClass;
+        snackBar.Add(message, severity);
+    }
+
+
+}
+
+
+
